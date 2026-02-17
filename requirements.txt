@@ -1,0 +1,13 @@
+transformers>=4.46.0
+gradio==5.20.0
+sentence-transformers
+torch
+scikit-learn
+scipy
+numpy
+pandas
+datasets
+duckdb
+pathlib
+gradio
+plotly
