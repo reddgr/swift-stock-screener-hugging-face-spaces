@@ -1,5 +1,5 @@
 transformers>=4.46.0
-gradio==5.20.0
+gradio
 sentence-transformers
 torch
 scikit-learn
@@ -11,3 +11,4 @@ duckdb
 pathlib
 gradio
 plotly
+# gradio==5.20.0
