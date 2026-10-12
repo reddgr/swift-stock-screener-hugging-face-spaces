@@ -12,23 +12,22 @@ App URL: https://huggingface.co/spaces/reddgr/sss
 '''
 
 ### DEBUGGING COMMAND (DGR):
-# cd C:\Users\david\Documents\git\miax-tfm-dgr; python app.py
+# cd C:\Users\david\Documents\git\sss; python app.py
 from pathlib import Path
 from typing import Tuple
 import pandas as pd
 import gradio as gr
 import json
+from datetime import datetime
 
 import duckdb
 from sentence_transformers import SentenceTransformer
-from datasets import load_dataset
 
 USE_DOTENV = False
 
 ROOT = Path(__file__).parent
 
 JSON_PATH = ROOT / "json"
-DATASET_PATH = "reddgr/swift-stock-screener" # Hugging Face hub dataset name
 EMB_MODEL_PATH = "FinLang/finance-embeddings-investopedia" # Hugging Face Hub embeddings model name
 DOTENV_PATH = ROOT.parent.parent / "apis" / ".env"
 PARQUET_PATH = ROOT / "parquet" / "app_dataset.parquet"
@@ -38,6 +37,16 @@ from src import front_dataset_handler as fdh, app_utils as utils, semantic_searc
 tokens = env_options.check_env(use_dotenv=USE_DOTENV, dotenv_path=DOTENV_PATH, env_tokens = ["HF_TOKEN"])
 
 emb_model = SentenceTransformer(EMB_MODEL_PATH, token = tokens.get("HF_TOKEN"))
+
+### Comprobación de la fecha de actualización del dataset Parquet ###
+def get_parquet_last_update(path: Path) -> str:
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%d")
+    except FileNotFoundError:
+        return "unavailable"
+
+PARQUET_LAST_UPDATE = get_parquet_last_update(PARQUET_PATH)
+print(f"Parquet dataset last update: {PARQUET_LAST_UPDATE}")
 
 #### CONEXIÓN DE DUCKDB CON EL DATASET PARA INDEXAR ####
 print("Initializing DuckDB connection...")
@@ -73,7 +82,10 @@ selected_ticker: str = ""
 # CONFIG --------------------------------------------------------------------
 # ---------------------------------------------------------------------------
 
-app_dataset = load_dataset(DATASET_PATH, split="train", token = tokens.get("HF_TOKEN")).to_pandas()
+app_dataset = con.execute(
+    "SELECT * FROM read_parquet(?)",
+    [str(PARQUET_PATH)],
+).fetchdf()
 dh_app = fdh.FrontDatasetHandler(app_dataset=app_dataset)
 maestro = dh_app.app_dataset[dh_app.app_dataset['quoteType']=='EQUITY'].copy()
 print("maestro_columns", maestro.columns.to_list())
@@ -373,6 +385,12 @@ with gr.Blocks(title="Swift Stock Screener, by Reddgr") as front:
                     label="",
                     scale=1,
                 )
+
+            # ---------------------- DATASET UPDATE DISPLAY ------------------------
+            dataset_update_display = gr.Markdown(
+                f"**Dataset last updated:** {PARQUET_LAST_UPDATE}",
+                elem_classes="search-spec",
+            )
 
         # ---- TAB 2: COMPANY --------------------------------------------------
         '''
@@ -690,9 +708,9 @@ with gr.Blocks(title="Swift Stock Screener, by Reddgr") as front:
         summary = _compose_summary()
         return slice_df, label, 1, summary
 
-# ---------------------------------------------------------------------------
-# LAUNCH --------------------------------------------------------------------
-# ---------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# LAUNCH ----------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 if __name__ == "__main__":
     front.launch()

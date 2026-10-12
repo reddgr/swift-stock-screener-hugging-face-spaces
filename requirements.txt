@@ -6,7 +6,6 @@ scikit-learn
 scipy
 numpy
 pandas
-datasets
 duckdb
 pathlib
 gradio
